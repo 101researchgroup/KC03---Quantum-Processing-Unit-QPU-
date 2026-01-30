@@ -1,0 +1,1296 @@
+﻿Chapter 3
+
+Quantum Processing Unit (QPU)
+A Quantum-Inspired Parallel Processing Architecture for QVM
+
+Karel Cápek
+
+Abstract
+
+The Quantum Processing Unit (QPU) is introduced as a massively paral-
+lel, quantum-inspired execution substrate designed to accelerate operator-
+based computation within the QVM ecosystem. Analogous to the role of
+GPUs in classical systems, QPUs execute QFM operators, diffusion flows,
+spectral transforms, and structured operator programs at scale—while
+remaining fully deterministic, reproducible, and auditable.
+Unlike conventional accelerators, QPU execution is intrinsically regulated.
+All workloads are authorized, classified, and bounded by the Quantum
+Field Processor (QFP), with safety classes, capability certificates, and
+execution limits enforced throughout the entire lifecycle. Acceleration is
+therefore inseparable from governance: increased throughput does not
+permit increased scope, nondeterminism, or bypass of policy constraints.
+The paper specifies the QPU architecture, including operator execution
+units, instruction set semantics, runtime scheduling, monitoring and
+enforcement logic, and interaction with the QVM runtime. Parallelism is
+operator-centric rather than data-centric, enabling efficient evaluation of
+global arithmetic dynamics while preserving strict semantic invariance
+under concurrency.
+Within the broader Quansistor Field Computing (QFC) stack, QFM
+defines the mathematical language of computation, QFP governs its
+legitimacy and safety, and QPU provides regulated high-performance
+execution. Together, these components demonstrate that performance,
+determinism, and accountability can be co-designed as integral properties
+of operator-first computational infrastructure.
+
+1 Introduction
+As operator-based computation scales in complexity and scope, the dominant bottleneck shifts
+from expressiveness to execution. While Quansistor Field Mathematics (QFM) provides a
+mathematically rich language for global, multiplicative operator dynamics, and the Quantum
+Field Processor (QFP) defines how such computation may be executed safely and legitimately,
+an additional architectural layer is required to make large-scale execution practical.
+The Quantum Processing Unit (QPU) is introduced as this layer. Its role is to provide high-
+throughput, massively parallel execution of QFM operator programs within the regulatory and
+
+62
+
+
+
+safety envelope enforced by QFP.
+
+1.1 Position of QPU Within the QVM Stack
+
+The QPU must be understood in relation to the other components of the QVM ecosystem.
+
+• QFM defines what computation is: an operator-theoretic language over arithmetic Hilbert
+spaces.
+
+• QFP defines whether and how computation may execute: safety, permissions, and auditabil-
+ity.
+
+• QPU defines how efficiently computation is executed: parallel acceleration, throughput,
+and scaling.
+
+This separation of concerns is intentional. QPU does not reinterpret operator semantics, nor
+does it weaken regulatory constraints. It exists to accelerate execution that has already been
+authorized and classified by QFP.
+
+1.2 Motivation for a Dedicated Processing Unit
+
+Operator-based computation exhibits characteristics that strain classical execution models.
+These include:
+
+• global state evolution rather than local register updates,
+• non-local operator effects across large index spaces,
+• high degrees of implicit parallelism,
+• heavy reliance on spectral transforms and diffusion processes.
+
+Executing such workloads on general-purpose processors is possible but inefficient. The QPU
+addresses this mismatch by providing execution units designed specifically for operator application,
+composition, and propagation.
+
+1.3 Analogy to Classical Accelerators
+
+The role of QPU is analogous to that of a GPU in classical computing, but the analogy is limited.
+
+• GPUs accelerate data-parallel numerical kernels.
+• QPUs accelerate operator-parallel arithmetic dynamics.
+
+Unlike GPUs, QPUs do not execute arbitrary programs. They execute a restricted instruction
+set derived from QFM operators and governed by QFP constraints. Acceleration is therefore
+inseparable from regulation.
+
+1.4 Regulated Acceleration
+
+A central design principle of QPU is that acceleration must not bypass control.
+In traditional systems, accelerators are often opaque execution domains with limited visibility or
+governance. In contrast, QPU execution is fully integrated into the QFP pipeline:
+
+63
+
+
+
+• all QPU workloads originate from authorized execution requests,
+• safety classes and capability bounds are enforced at dispatch time,
+• execution is monitored and auditable,
+• results are sealed and verified in the same manner as non-accelerated execution.
+
+The QPU is therefore not a loophole, but an extension of regulated execution capacity.
+
+1.5 Scope of the QPU Architecture
+
+The QPU architecture defined in this paper is intentionally abstract.
+It specifies:
+
+• execution units and their responsibilities,
+• an instruction model for operator execution,
+• runtime semantics and scheduling principles,
+• security and compliance integration.
+
+It does not specify:
+• a particular hardware implementation,
+• a fixed memory hierarchy,
+• a single deployment environment.
+
+This allows QPU to be instantiated as specialized hardware, firmware, or highly optimized
+software, without altering its semantics.
+
+1.6 Threat Model and Constraints
+
+Acceleration increases risk as well as capability. QPU is therefore designed under explicit
+constraints.
+
+• No execution may exceed bounds authorized by QFP.
+• No instruction may induce unclassified operator behavior.
+• No execution context may persist beyond its permitted lifetime.
+
+These constraints are architectural, not advisory. Violations result in deterministic termination
+and sealed audit records.
+
+1.7 Determinism and Reproducibility
+
+Despite its parallel nature, QPU execution is deterministic by design.
+Given:
+
+• the same operator program,
+• the same execution bounds,
+• the same QPU configuration,
+
+64
+
+
+
+the resulting sealed output is identical.
+Parallelism affects performance, not semantics. This property is essential for scientific repro-
+ducibility, regulatory compliance, and governance.
+
+1.8 Relation to Quantum-Inspired Computation
+
+The QPU is quantum-inspired but not quantum.
+
+• It does not rely on physical qubits.
+• It does not perform probabilistic measurement.
+• It does not require quantum coherence.
+
+Instead, it accelerates deterministic operator dynamics that exhibit quantum-like structure due
+to their mathematical formulation.
+
+1.9 Audience and Intent
+
+This document is written for:
+• system architects,
+• security and compliance engineers,
+• researchers deploying operator-based computation at scale.
+
+It is not a marketing document and does not attempt to justify the usefulness of QPU through
+performance claims alone. Its purpose is to define a clear, inspectable architecture for regulated
+acceleration.
+
+1.10 Roadmap of This Paper
+
+The remainder of this paper proceeds as follows:
+• Chapter 2 specifies the internal architecture of the QPU.
+• Chapter 3 defines the instruction set and execution primitives.
+• Chapter 4 describes runtime semantics and scheduling.
+• Subsequent chapters address security, scaling, governance, and applications.
+
+Together, these sections define QPU as a coherent component of the QVM stack, bridging
+mathematical expressiveness and practical execution.
+
+2 QPU Architecture and Execution Units
+
+The Quantum Processing Unit (QPU) is designed as a parallel execution substrate specialized
+for operator-based computation. Its architecture reflects the structure of QFM operators and the
+regulatory constraints imposed by QFP, while remaining independent of any specific hardware
+implementation.
+This section describes the internal architecture of the QPU, its execution units, and the interfaces
+through which it interacts with the surrounding QVM stack.
+
+65
+
+
+
+2.1 Architectural Overview
+
+At a high level, the QPU consists of the following functional components:
+
+1. Dispatch and Control Interface
+2. Operator Execution Units
+3. State and Memory Subsystem
+4. Scheduling and Synchronization Layer
+5. Monitoring and Enforcement Logic
+
+Each component has a strictly defined role. No component independently authorizes execution
+or modifies regulatory constraints.
+
+2.2 Dispatch and Control Interface
+
+The Dispatch and Control Interface forms the boundary between QFP and QPU.
+Its responsibilities include:
+
+• receiving execution workloads approved by QFP,
+• verifying execution bounds and constraints,
+• instantiating isolated execution contexts,
+• routing operator programs to appropriate execution units.
+
+The interface accepts only fully authorized workloads. It does not perform safety classification or
+permission checks itself, but it enforces all constraints encoded in the execution request.
+
+2.3 Execution Contexts
+
+Each QPU workload executes within an explicit execution context.
+An execution context defines:
+
+• the operator program to be executed,
+• resource and time bounds,
+• permitted operator primitives,
+• isolation boundaries.
+
+Contexts are non-persistent by default and are destroyed upon completion or termination of
+execution.
+
+2.4 Operator Execution Units
+
+The core computational elements of the QPU are the Operator Execution Units (OEUs).
+Each OEU is specialized to execute a class of QFM primitives, including:
+
+• forward and backward prime-shift operators,
+• self-adjoint generator applications,
+
+66
+
+
+
+• diffusion and aggregation operators,
+• spectral transforms and reductions.
+
+OEUs operate in parallel across independent regions of the arithmetic state space, subject to
+synchronization constraints.
+
+2.5 Parallelism Model
+
+QPU parallelism is operator-centric rather than data-centric.
+Parallelism arises from:
+
+• independent prime channels,
+• disjoint arithmetic index regions,
+• concurrent operator applications.
+
+The architecture does not assume SIMD-style uniformity. Different OEUs may execute different
+operator primitives concurrently, provided regulatory constraints are satisfied.
+
+2.6 State and Memory Subsystem
+
+The State and Memory Subsystem manages arithmetic amplitudes and auxiliary execution state.
+Its responsibilities include:
+
+• storage of distributed arithmetic state,
+• efficient access to multiplicative neighborhoods,
+• enforcement of memory isolation between contexts,
+• controlled persistence where explicitly permitted.
+
+The memory model is abstract and does not prescribe physical layout. It must, however, preserve
+deterministic semantics.
+
+2.7 Scheduling and Synchronization
+
+The Scheduling Layer coordinates execution across OEUs.
+Scheduling decisions consider:
+
+• execution priorities encoded in the request,
+• safety class–dependent constraints,
+• resource availability and contention,
+• synchronization barriers required by operator composition.
+
+Synchronization ensures that operator dependencies are respected without introducing nondeter-
+ministic behavior.
+
+2.8 Monitoring and Enforcement Logic
+
+QPU includes dedicated logic to monitor execution in real time.
+
+67
+
+
+
+This logic:
+• tracks resource usage against declared bounds,
+• enforces iteration and recursion limits,
+• detects violations of execution invariants,
+• triggers deterministic termination when necessary.
+
+Monitoring operates independently of operator execution units and cannot be disabled by
+workloads.
+
+2.9 Isolation and Fault Containment
+
+Isolation is enforced at multiple levels:
+• between execution contexts,
+• between operator programs,
+• between QPU and external systems.
+
+Faults or violations in one context do not propagate to others. This containment is essential for
+safe parallel execution.
+
+2.10 Interaction with QVM Runtime
+
+The QPU does not operate autonomously. It is orchestrated by the QVM Runtime, which:
+• allocates QPU resources,
+• manages lifecycle of execution contexts,
+• coordinates multi-QPU deployments.
+
+QPU exposes a narrow, explicit interface to the runtime, minimizing attack surface and complexity.
+
+2.11 Determinism Under Parallel Execution
+
+Despite concurrency, the QPU architecture preserves determinism.
+Determinism is ensured by:
+
+• fixed scheduling policies within execution contexts,
+• explicit synchronization points,
+• prohibition of race-dependent state updates.
+
+Parallelism affects throughput and latency, not semantic outcomes.
+
+2.12 Extensibility of Execution Units
+
+The architecture permits extension through additional OEUs.
+New operator primitives may be supported by introducing new execution unit types, provided
+they:
+
+68
+
+
+
+• implement formally specified operator semantics,
+• integrate with monitoring and enforcement logic,
+• remain subject to QFP constraints.
+
+This allows QPU to evolve without compromising safety or correctness.
+
+2.13 Preparation for Instruction Semantics
+
+With the architectural components defined, the next step is to specify how operator programs
+are represented and executed at the instruction level.
+The following section introduces the QPU instruction model and defines the primitive operations
+supported by the execution units.
+
+3 QPU Instruction Set Architecture (ISA)
+The Quantum Processing Unit executes operator programs through a restricted and formally
+specified Instruction Set Architecture (ISA). The QPU ISA is not a general-purpose instruction
+language; it is a domain-specific execution interface designed to realize QFM operator semantics
+under the constraints enforced by QFP.
+This section defines the principles, structure, and semantics of the QPU ISA.
+
+3.1 Design Goals of the QPU ISA
+
+The ISA is designed to satisfy the following goals:
+• faithful realization of QFM operator semantics,
+• determinism under parallel execution,
+• enforceability of safety and capability constraints,
+• auditability of instruction-level behavior.
+
+The ISA intentionally excludes instructions that would enable arbitrary control flow, self-modifying
+code, or unbounded recursion.
+
+3.2 Instruction Programs
+
+A QPU instruction program is a finite, ordered sequence of instructions, optionally parameterized
+and bounded by explicit execution limits.
+Instruction programs are:
+
+• immutable once dispatched,
+• executed within a single execution context,
+• subject to Safety Kernel classification as a whole.
+
+Individual instructions do not carry independent authority; authority is granted only at the
+program level via QFP.
+
+69
+
+
+
+3.3 Instruction Categories
+
+The QPU ISA is organized into instruction categories reflecting operator roles.
+
+Operator Application Instructions. These instructions apply QFM operators to arithmetic
+state:
+
+• forward prime-shift,
+• backward prime-shift,
+• self-adjoint generator application,
+• diffusion step.
+
+Aggregation and Reduction Instructions. These instructions combine or summarize
+arithmetic amplitudes:
+
+• weighted sum,
+• norm or energy evaluation,
+• projection onto subspaces.
+
+Spectral Instructions. These instructions perform spectral analysis or transformation:
+• spectral decomposition primitives,
+• filtering and band selection,
+• resonance detection.
+
+Control and Synchronization Instructions. These instructions coordinate execution:
+• barrier synchronization,
+• bounded iteration,
+• conditional termination.
+
+3.4 Instruction Format
+
+Each instruction has a fixed, explicit format consisting of:
+• opcode identifying the operation,
+• operand references,
+• parameter fields,
+• constraint annotations.
+
+Constraint annotations specify limits such as iteration bounds or resource caps and are verified
+at dispatch time.
+
+70
+
+
+
+3.5 Operator Binding
+
+Operator instructions reference abstract QFM operators rather than concrete implementations.
+Binding occurs at dispatch time:
+
+• operators are resolved to execution unit implementations,
+• parameter ranges are validated,
+• compatibility with safety class is enforced.
+
+This indirection allows operator semantics to remain stable while execution units evolve.
+
+3.6 Deterministic Semantics
+
+The semantics of each instruction are deterministic.
+Given:
+
+• identical input state,
+• identical instruction sequence,
+• identical execution bounds,
+
+the resulting state and sealed output are identical.
+Parallel execution does not introduce race-dependent behavior; instruction ordering and synchro-
+nization are explicitly defined.
+
+3.7 Bounded Iteration and Control
+
+Iteration is supported only through bounded constructs.
+An iteration instruction must specify:
+
+• maximum iteration count,
+• termination condition,
+• resource budget.
+
+Unbounded loops, self-referential jumps, or dynamic instruction generation are prohibited by the
+ISA.
+
+3.8 Memory and State Access Semantics
+
+Instructions may access arithmetic state only through defined interfaces.
+Access rules include:
+
+• explicit declaration of accessed regions,
+• no implicit global mutation,
+• isolation between execution contexts.
+
+These rules prevent hidden side effects and facilitate audit.
+
+71
+
+
+
+3.9 Error and Exception Handling
+
+The ISA defines explicit error conditions.
+Errors include:
+
+• violation of execution bounds,
+• invalid parameter values,
+• synchronization failures.
+
+Errors result in deterministic termination and generation of a sealed termination record.
+
+3.10 Safety and Capability Enforcement at ISA Level
+
+ISA execution is continuously checked against:
+• assigned safety class,
+• capability certificate constraints,
+• policy configuration.
+
+Instructions that would exceed authorized behavior are not executed.
+
+3.11 Auditability of Instruction Execution
+
+Each instruction execution contributes to the execution trace.
+The trace records:
+
+• instruction identifiers,
+• parameter values,
+• execution ordering and synchronization points.
+
+Trace data are summarized and sealed without exposing full internal state.
+
+3.12 ISA Extensibility
+
+The ISA is extensible under governance control.
+New instructions may be added provided they:
+
+• correspond to formally defined operator semantics,
+• admit static safety analysis,
+• integrate with monitoring and enforcement logic.
+
+Backward compatibility is maintained through versioned ISA definitions.
+
+3.13 Preparation for Runtime Semantics
+
+With the instruction set defined, the next section specifies how instruction programs are scheduled,
+executed, and terminated at runtime.
+
+72
+
+
+
+This includes execution phases, resource allocation, and interaction with QVM runtime orches-
+tration.
+
+4 Runtime Semantics and Scheduling
+The runtime semantics of the Quantum Processing Unit define how instruction programs are
+executed over time, how resources are allocated, and how parallelism is coordinated without
+compromising determinism, safety, or auditability.
+This section specifies the execution lifecycle of QPU workloads, the scheduling model, and the
+interaction between runtime control and regulatory constraints.
+
+4.1 Execution Lifecycle
+
+Each QPU instruction program follows a well-defined lifecycle consisting of the following phases:
+
+1. Context Initialization
+2. Resource Allocation
+3. Instruction Dispatch
+4. Parallel Execution
+5. Monitoring and Enforcement
+6. Termination and Cleanup
+
+Transitions between phases are explicit and irreversible.
+
+4.2 Context Initialization
+
+Upon dispatch from QFP, the QPU runtime creates a new execution context.
+Context initialization includes:
+
+• instantiation of an isolated arithmetic state view,
+• binding of execution bounds and constraints,
+• association with safety class and capability identifiers,
+• initialization of runtime metadata.
+
+No instruction execution occurs before context initialization completes successfully.
+
+4.3 Resource Allocation
+
+The runtime allocates resources according to the execution request.
+Resources include:
+
+• operator execution units,
+• memory and state storage capacity,
+• scheduling slots and synchronization primitives.
+
+73
+
+
+
+Allocation respects:
+• capability-imposed limits,
+• safety-class-specific ceilings,
+• global system availability.
+
+If allocation cannot be satisfied, execution is rejected prior to instruction dispatch.
+
+4.4 Instruction Dispatch
+
+Instruction dispatch maps the instruction program onto available execution units.
+Dispatch is governed by:
+
+• declared instruction dependencies,
+• synchronization barriers,
+• execution priorities encoded in the request.
+
+Dispatch decisions are deterministic within an execution context.
+
+4.5 Parallel Execution Semantics
+
+Instructions may execute in parallel provided their declared dependencies do not conflict.
+Parallel execution respects:
+
+• isolation of arithmetic state regions,
+• explicit synchronization points,
+• fixed ordering for dependent instructions.
+
+Parallelism is exploited only where it does not affect semantic outcomes.
+
+4.6 Scheduling Model
+
+The QPU scheduling model is constraint-driven rather than opportunistic.
+Scheduling considers:
+
+• safety class–dependent scheduling policies,
+• fairness across execution contexts,
+• avoidance of starvation or priority inversion.
+
+The scheduler does not reorder instructions in a way that would alter deterministic behavior.
+
+4.7 Monitoring During Execution
+
+Runtime monitoring operates continuously during execution.
+Monitored properties include:
+
+• resource usage against declared bounds,
+• iteration and recursion counters,
+
+74
+
+
+
+• compliance with synchronization constraints.
+Monitoring logic is independent of instruction execution and cannot be disabled.
+
+4.8 Enforcement and Intervention
+
+If a violation is detected, the runtime intervenes deterministically.
+Intervention actions include:
+
+• throttling execution,
+
+• suspending instruction dispatch,
+
+• terminating the execution context.
+All interventions are recorded and included in the final sealed result.
+
+4.9 Termination Conditions
+
+Execution terminates under one of the following conditions:
+• normal completion of the instruction program,
+
+• satisfaction of a declared termination condition,
+
+• enforcement-triggered termination,
+
+• external revocation of execution authority.
+Termination is explicit and results in context teardown.
+
+4.10 Cleanup and State Disposal
+
+Upon termination, the runtime performs cleanup operations:
+• release of allocated resources,
+
+• disposal of ephemeral arithmetic state,
+
+• finalization of execution metadata.
+Persistent state is retained only if explicitly permitted by policy.
+
+4.11 Determinism Guarantees
+
+The runtime guarantees that:
+• execution order within contexts is fixed,
+
+• scheduling decisions are reproducible,
+
+• parallel execution does not introduce nondeterminism.
+Performance variability does not affect semantic results.
+
+75
+
+
+
+4.12 Interaction with QVM Runtime
+
+The QPU runtime is subordinate to the QVM Runtime.
+The QVM Runtime:
+
+• orchestrates multiple QPUs,
+• manages cross-QPU scheduling,
+• enforces system-wide policies.
+
+The QPU runtime exposes only minimal control interfaces to reduce complexity and attack
+surface.
+
+4.13 Preparation for Security and Compliance
+
+With runtime semantics defined, the next section addresses security, abuse prevention, and
+compliance integration specific to QPU execution.
+This includes protection against misuse of acceleration capabilities and alignment with the
+broader QFP governance framework.
+
+5 Security, Abuse Prevention, and Compliance
+Acceleration fundamentally amplifies both capability and risk. The Quantum Processing Unit
+therefore incorporates security and compliance mechanisms as integral architectural components
+rather than external safeguards.
+This section specifies how QPU execution is protected against misuse, how abuse scenarios are
+detected and prevented, and how compliance with QFP governance and regulatory requirements
+is enforced at the accelerator level.
+
+5.1 Threat Model for Accelerated Execution
+
+The QPU threat model extends beyond classical computation.
+Relevant threats include:
+
+• amplification of unsafe operator dynamics,
+• circumvention of execution bounds through parallelism,
+• covert execution of prohibited operator programs,
+• leakage of sensitive arithmetic state through side channels,
+• persistence of unauthorized execution contexts.
+
+Security mechanisms are designed to address these threats without reducing the expressive power
+of authorized computation.
+
+5.2 Enforcement of Safety Classes at QPU Level
+
+Safety classification performed by QFP remains authoritative during QPU execution.
+The QPU enforces safety classes by:
+
+76
+
+
+
+• restricting available instruction subsets,
+• enforcing stricter resource ceilings for higher classes,
+• limiting parallel fan-out and execution depth,
+• requiring additional monitoring for high-impact classes.
+
+Safety constraints are applied at dispatch time and continuously enforced during execution.
+
+5.3 Capability-Based Access Control
+
+Every QPU execution context is bound to a capability certificate.
+This binding ensures that:
+
+• execution privileges cannot exceed authorized scope,
+• acceleration cannot be used to bypass QFP decisions,
+• revocation of capability immediately affects execution rights.
+
+Capability enforcement is performed locally by the QPU runtime and does not depend on external
+trust during execution.
+
+5.4 Prevention of Acceleration Abuse
+
+Acceleration abuse occurs when computational speed enables behavior that would be impractical
+or detectable at lower speeds.
+QPU mitigates such abuse by:
+
+• enforcing absolute execution limits independent of speed,
+• monitoring cumulative execution impact,
+• throttling or terminating suspicious execution patterns.
+
+Faster execution does not permit greater scope.
+
+5.5 Isolation and Side-Channel Resistance
+
+Isolation is critical in a shared accelerator environment.
+QPU enforces isolation through:
+
+• per-context state separation,
+• restricted memory access patterns,
+• elimination of shared mutable execution state.
+
+Where hardware support exists, additional side-channel mitigations may be employed, but the
+architecture does not assume their presence.
+
+5.6 Detection of Prohibited Behavior
+
+The QPU runtime actively detects prohibited behavior, including:
+• attempts to exceed declared iteration bounds,
+
+77
+
+
+
+• unauthorized instruction sequences,
+• modification of execution metadata,
+• evasion of monitoring hooks.
+
+Detection triggers deterministic intervention and immediate sealing of the incident.
+
+5.7 Integration with Result Sealing
+
+All security-relevant events are included in the sealed result object.
+This includes:
+
+• enforcement actions taken,
+• violations detected,
+• termination reasons and timing.
+
+Sealing ensures that security incidents cannot be hidden or altered after the fact.
+
+5.8 Compliance Enforcement
+
+QPU execution complies with governance and regulatory policy through:
+• adherence to policy artifacts defined by governance,
+• generation of compliance proofs for each execution,
+• retention of audit records suitable for inspection.
+
+Compliance is verified independently of execution performance or outcome.
+
+5.9 Emergency Controls
+
+In coordination with QFP, the QPU supports emergency controls.
+These include:
+
+• immediate termination of active contexts,
+• suspension of execution classes,
+• disabling of specific instruction categories.
+
+Emergency controls are auditable and subject to governance review.
+
+5.10 No Trusted Execution Assumptions
+
+The QPU architecture does not rely on trusted execution environments.
+Security is enforced through:
+
+• explicit constraints,
+• deterministic monitoring,
+• cryptographically verifiable audit.
+
+This avoids reliance on opaque hardware guarantees.
+
+78
+
+
+
+5.11 Forensic and Post-Incident Analysis
+
+In the event of security incidents, QPU provides sufficient data for forensic analysis.
+Investigators can reconstruct:
+
+• the exact execution context,
+• applied safety and capability constraints,
+• sequence of enforcement actions.
+
+This reconstruction does not require re-execution.
+
+5.12 Preparation for Scaling and Deployment
+
+With security and compliance defined, the remaining challenge is scaling QPU deployment across
+systems and environments.
+The next section addresses scaling strategies, sharding, and resource management for QPU
+instances operating at scale.
+
+6 Scaling, Sharding, and Resource Management
+The Quantum Processing Unit is designed to operate not only as a standalone accelerator,
+but as a scalable component within large, distributed computational systems. Scaling QPU
+execution must preserve the same core properties that govern single-unit operation: determinism,
+enforceable constraints, and auditability.
+This section describes how QPU instances scale horizontally and vertically, how execution is
+sharded, and how resources are managed without weakening regulatory guarantees.
+
+6.1 Scaling Objectives
+
+The primary objectives of QPU scaling are:
+• increased throughput for operator workloads,
+• parallel evaluation of independent arithmetic regions,
+• fault isolation and resilience,
+• efficient utilization of heterogeneous resources.
+
+Scaling is treated as a performance concern, not as a semantic extension of the computation
+model.
+
+6.2 Horizontal and Vertical Scaling
+
+QPU supports both horizontal and vertical scaling.
+
+Vertical Scaling. Vertical scaling increases the capacity of a single QPU instance by adding:
+• additional operator execution units,
+• larger arithmetic state memory,
+
+79
+
+
+
+• higher bandwidth for internal synchronization.
+Vertical scaling preserves a single execution context boundary.
+
+Horizontal Scaling. Horizontal scaling deploys multiple QPU instances operating in parallel.
+Each instance executes independently under coordination of the QVM Runtime.
+Horizontal scaling introduces orchestration challenges addressed through explicit sharding and
+scheduling policies.
+
+6.3 Sharding of Execution Workloads
+
+Sharding decomposes execution workloads into disjoint units that may be executed concurrently.
+Shards are defined by:
+
+• arithmetic index regions,
+• operator subprogram boundaries,
+• independent spectral components.
+
+Sharding decisions are made at dispatch time and are immutable during execution.
+
+6.4 Shard Isolation and Safety
+
+Each shard executes within its own isolated execution context.
+Isolation ensures that:
+
+• state mutations do not leak across shards,
+• faults are contained locally,
+• safety constraints are enforced per shard.
+
+Global safety classification applies uniformly to all shards of a single execution request.
+
+6.5 Shard Coordination and Synchronization
+
+Some operator programs require coordination across shards.
+Synchronization is achieved through:
+
+• explicit barrier instructions,
+• bounded reduction and aggregation phases,
+• deterministic ordering of shard-level results.
+
+Implicit or ad-hoc synchronization is prohibited.
+
+6.6 Resource Allocation Model
+
+QPU resource management is capability-driven.
+Allocated resources include:
+
+• number of execution units,
+
+80
+
+
+
+• memory capacity,
+• execution time budgets.
+
+Allocations must satisfy:
+• safety-class-specific ceilings,
+• capability certificate constraints,
+• global system policies.
+
+Over-allocation is not permitted, even under low system load.
+
+6.7 Dynamic Load Management
+
+The QVM Runtime may dynamically adjust resource distribution across QPU instances.
+Adjustments include:
+
+• rebalancing workloads between QPUs,
+• throttling execution contexts,
+• deferring low-priority workloads.
+
+Dynamic adjustments do not alter execution semantics or authorized bounds.
+
+6.8 Prevention of Cross-Shard Abuse
+
+Scaling introduces the risk of abuse through distributed execution.
+QPU prevents cross-shard abuse by:
+
+• aggregating resource usage across shards,
+• enforcing global execution limits,
+• detecting correlated execution patterns.
+
+Acceleration across shards does not permit exceeding authorized impact.
+
+6.9 Fault Tolerance and Degraded Operation
+
+QPU scaling includes explicit fault-handling semantics.
+In the presence of faults:
+
+• affected shards are terminated deterministically,
+• partial results are sealed and marked incomplete,
+• re-execution requires fresh authorization.
+
+There is no silent failover that would bypass regulatory checks.
+
+6.10 Heterogeneous Deployment
+
+The architecture supports heterogeneous QPU deployments.
+Different QPU instances may vary in:
+
+81
+
+
+
+• performance characteristics,
+• supported execution units,
+• hardware acceleration features.
+
+Heterogeneity is abstracted by the runtime and does not affect correctness or compliance.
+
+6.11 Accounting and Cost Attribution
+
+Resource usage is explicitly accounted.
+Accounting data include:
+
+• per-shard resource consumption,
+• execution duration,
+• enforcement interventions.
+
+This data supports capacity planning, cost attribution, and governance oversight.
+
+6.12 Preparation for Applications and Use Cases
+
+With scaling and resource management defined, the QPU architecture is now complete at the
+systems level.
+The next section examines concrete application domains and illustrates how regulated, accelerated
+operator execution may be applied in practice.
+
+7 Applications and Use Cases
+
+The Quantum Processing Unit is not a general-purpose accelerator. Its value emerges in
+application domains where computation is naturally expressed in terms of operator dynamics,
+global state evolution, and structured parallelism.
+This section surveys representative application classes for which QPU provides meaningful
+advantages, while explicitly noting the boundaries of its applicability.
+
+7.1 Mathematical and Number-Theoretic Computation
+
+QPU is particularly well-suited for operator-based mathematical experimentation.
+Relevant workloads include:
+
+• large-scale spectral exploration of arithmetic operators,
+• simulation of diffusion processes over multiplicative structures,
+• evaluation of trace-like invariants and operator statistics,
+• parallel experimentation with bounded operator families.
+
+The deterministic semantics of QPU execution ensure reproducibility of results, a critical
+requirement in mathematical research.
+
+82
+
+
+
+7.2 Scientific Simulation with Global Coupling
+
+Certain scientific models involve global coupling rather than local interaction.
+Examples include:
+
+• systems governed by integral or operator equations,
+• diffusion or transport phenomena on non-Euclidean index spaces,
+• models with long-range arithmetic or spectral interactions.
+
+QPU acceleration enables such simulations to be executed efficiently while remaining bounded
+and auditable.
+
+7.3 AI and Algorithmic Search
+
+QPU is not designed to replace conventional AI accelerators, but it may support specific AI-
+adjacent workloads.
+Applicable cases include:
+
+• structured search over operator-defined state spaces,
+• exploration of constrained hypothesis spaces,
+• evaluation of global scoring or energy functions.
+
+QPU does not provide probabilistic sampling or learning primitives; its role is confined to
+deterministic operator execution.
+
+7.4 Cryptography and Security Analysis
+
+Certain cryptographic and security analyses can be expressed in operator form.
+Potential applications include:
+
+• bounded exploration of arithmetic structures,
+• analysis of diffusion and propagation properties,
+• controlled experimentation with cryptographic primitives.
+
+Regulated execution is particularly important in this domain, where misuse or uncontrolled
+experimentation may have external consequences.
+
+7.5 Financial and Economic Modeling
+
+Economic systems often exhibit global dependencies and feedback.
+QPU may support:
+
+• operator-based market dynamics models,
+• stress testing under bounded scenarios,
+• exploration of systemic risk indicators.
+
+Execution constraints and auditability are essential in regulated financial contexts.
+
+83
+
+
+
+7.6 Distributed Research Infrastructure
+
+QPU can function as part of a shared research infrastructure.
+In such settings:
+
+• multiple users submit bounded operator workloads,
+
+• execution privileges are controlled via capability certificates,
+
+• results are sealed and auditable.
+This enables collaborative experimentation without relinquishing control over system-wide risk.
+
+7.7 What QPU Is Not Suitable For
+
+It is equally important to clarify what QPU is not intended to do.
+QPU is not:
+
+• a replacement for GPUs in numerical linear algebra,
+
+• a general-purpose CPU,
+
+• a probabilistic or quantum hardware simulator,
+
+• an unrestricted high-performance compute engine.
+Using QPU outside its intended domain would yield limited benefit and may introduce unnecessary
+complexity.
+
+7.8 Performance Versus Governance Trade-offs
+
+QPU prioritizes bounded execution over maximal raw performance.
+In some cases:
+
+• execution may be slower than unconstrained accelerators,
+
+• additional overhead is incurred for monitoring and audit,
+
+• resource limits may restrict exploration depth.
+These trade-offs are deliberate and reflect the architectural goals of the QVM ecosystem.
+
+7.9 Early Adoption Scenarios
+
+Early adopters of QPU are likely to include:
+• academic research groups,
+
+• regulated research laboratories,
+
+• institutions requiring accountable computation.
+In these environments, reproducibility and governance outweigh raw throughput.
+
+84
+
+
+
+7.10 Preparation for Governance and Licensing
+
+With application domains identified, the final architectural concern is how QPU deployment and
+usage are governed and licensed.
+The next section addresses governance models, licensing considerations, and long-term sustain-
+ability of QPU-based systems.
+
+8 Governance, Licensing, and Sustainability
+The deployment of Quantum Processing Units raises questions that extend beyond architecture
+and performance. Because QPU accelerates computation with potentially global impact, its
+operation must be governed in a way that preserves safety, accountability, and long-term
+sustainability.
+This section describes governance models, licensing considerations, and operational sustainability
+for QPU-based systems within the QVM ecosystem.
+
+8.1 Separation of Governance and Execution
+
+A core principle inherited from QFP is the strict separation between governance and execution.
+
+• Governance defines policies, permissions, and constraints.
+• Execution applies those rules deterministically.
+
+QPU does not interpret policy; it enforces it. Governance decisions are expressed as versioned
+artifacts that are cryptographically verifiable and cannot be altered retroactively.
+
+8.2 Governance Scope
+
+Governance mechanisms may regulate:
+• which safety classes may be accelerated on QPU,
+• which instruction categories are enabled,
+• resource ceilings and scaling limits,
+• emergency suspension conditions.
+
+Governance mechanisms may not:
+• override Safety Kernel decisions for individual executions,
+• bypass runtime enforcement,
+• modify sealed historical records.
+
+This prevents discretionary intervention in specific computations.
+
+8.3 Capability Issuance and Control
+
+Access to QPU acceleration is mediated through capability certificates defined at the QFP layer.
+Capabilities may specify:
+
+85
+
+
+
+• permitted safety classes for accelerated execution,
+• maximum resource allocation,
+• validity period and revocation conditions,
+• delegation constraints.
+
+Revocation of a capability immediately affects QPU execution rights without requiring system-
+wide shutdown.
+
+8.4 Licensing Models
+
+The QPU architecture itself is neutral with respect to licensing, but its deployment requires clear
+licensing frameworks.
+Possible models include:
+
+• open research licenses for academic use,
+• institutional licenses with regulated access,
+• restricted licenses for high-impact or sensitive workloads.
+
+Licensing constraints are enforced operationally through governance policy rather than contractual
+trust alone.
+
+8.5 Compliance with Legal and Regulatory Frameworks
+
+QPU-based systems are designed to be compatible with diverse legal and regulatory environments.
+Compliance is achieved by:
+
+• encoding regulatory requirements as policy artifacts,
+• generating verifiable audit and compliance records,
+• supporting minimal-disclosure verification.
+
+Jurisdiction-specific differences are handled through policy variation, not architectural divergence.
+
+8.6 Transparency and Accountability
+
+Accountability is provided through:
+• cryptographically sealed execution records,
+• verifiable enforcement actions,
+• reproducible decision logic.
+
+Transparency concerns system behavior and governance decisions, not necessarily disclosure of
+computational content.
+
+8.7 Sustainability of Shared Infrastructure
+
+QPU systems may be operated as shared infrastructure.
+Sustainability considerations include:
+
+86
+
+
+
+• fair resource allocation across users,
+• prevention of monopolization through acceleration,
+• long-term maintainability of policy and runtime software.
+
+Capability-based access and explicit accounting support these goals.
+
+8.8 Evolution of Governance
+
+Governance frameworks must evolve as new risks and use cases emerge.
+Evolution is supported through:
+
+• versioned policy updates,
+• backward-compatible execution semantics,
+• explicit transition periods.
+
+Past executions remain verifiable under the policies in effect at their time of execution.
+
+8.9 Avoidance of Centralized Control
+
+Although governance authority exists, QPU systems avoid centralized technical control.
+Execution nodes verify policy artifacts independently. This prevents covert policy manipulation
+and reduces single points of failure.
+
+8.10 Long-Term Perspective
+
+The long-term viability of QPU depends not only on performance, but on trustworthiness.
+By embedding governance, licensing, and accountability into the execution architecture itself, QPU
+provides a foundation for sustained, responsible use of accelerated operator-based computation.
+
+8.11 Conclusion
+
+The Quantum Processing Unit completes the QVM stack by providing regulated, deterministic
+acceleration of operator programs.
+Its architecture demonstrates that performance, safety, and governance need not be mutually
+exclusive, but can be co-designed as integral components of a coherent computational system.
+
+87
