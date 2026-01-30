@@ -6,7 +6,7 @@ series: "Quansistor Field Computing — Compendium"
 
 org: "101research.group"
 project_home: "https://101research.group"
-repo_url: "https://github.com/101researchgroup/KC03---Quantum-Processing-Unit-QPU"
+repo_url: "https://github.com/101researchgroup/KC03---Quantum-Processing-Unit-QPU-"
 
 doi: "10.5281/zenodo.18175530"
 isbn: "978-80-11-08018-1"
